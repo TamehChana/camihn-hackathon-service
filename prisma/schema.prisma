@@ -1,0 +1,68 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Team {
+  id           String        @id @default(cuid())
+  teamName     String
+  institution  String?
+  leadName     String
+  leadEmail    String
+  leadPhone    String
+  leadRole     String
+  status       TeamStatus    @default(PENDING)
+  members      TeamMember[]
+  payments     Payment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([leadEmail])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String
+  name      String
+  email     String
+  role      String?
+  createdAt DateTime @default(now())
+
+  @@index([teamId])
+}
+
+model Payment {
+  id             String         @id @default(cuid())
+  team           Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId         String
+  amount         Int
+  currency       String
+  provider       String
+  providerRef    String
+  status         PaymentStatus  @default(INITIATED)
+  rawPayload     Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([teamId])
+}
+
+enum TeamStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum PaymentStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+}
+
+
