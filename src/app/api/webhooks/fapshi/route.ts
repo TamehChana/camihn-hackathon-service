@@ -16,6 +16,8 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get("x-fapshi-signature");
     const rawBody = await req.text();
 
+    console.log("Fapshi webhook raw body:", rawBody);
+
     // TODO: Implement signature verification logic using Fapshi's recommended method.
     // This typically involves computing an HMAC with a shared secret and
     // comparing it to the signature header. See:
@@ -26,8 +28,12 @@ export async function POST(req: NextRequest) {
       // verifySignature(rawBody, signature, process.env.FAPSHI_WEBHOOK_SECRET);
     }
 
-    const payload = JSON.parse(rawBody) as FapshiWebhookPayload;
-    const providerRef = payload.reference;
+    const payload = JSON.parse(rawBody) as FapshiWebhookPayload & {
+      transId?: string;
+      externalId?: string;
+    };
+    const providerRef =
+      payload.reference || payload.externalId || payload.transId || "";
 
     if (!providerRef) {
       return NextResponse.json({ received: true }, { status: 200 });
