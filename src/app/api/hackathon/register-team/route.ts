@@ -72,21 +72,20 @@ export async function POST(req: NextRequest) {
     // 2) Create payment with Fapshi (Initiate Pay)
     const reference = `CAMIHN-${team.id}-${Date.now()}`;
 
-    const rawApiUser = process.env.FAPSHI_API_USER;
     const rawApiKey = process.env.FAPSHI_API_KEY;
-    const apiUser = rawApiUser?.trim();
     const apiKey = rawApiKey?.trim();
 
-    if (!apiUser || !apiKey) {
-      console.error("Fapshi configuration error: missing FAPSHI_API_USER or FAPSHI_API_KEY");
+    if (!apiKey) {
+      console.error("Fapshi configuration error: missing FAPSHI_API_KEY");
       return NextResponse.json(
         { error: "Payment configuration error" },
         { status: 500, headers: corsHeaders },
       );
     }
 
-    // Helpful debug log (masked) to confirm which apiUser is loaded in this environment
-    console.log("Fapshi apiUser (masked):", `${apiUser.substring(0, 6)}...`, "len:", apiUser.length);
+    // In sandbox, docs show both headers using the API key value
+    const apiUser = apiKey;
+    console.log("Fapshi apiUser/apikey (masked):", `${apiUser.substring(0, 6)}...`, "len:", apiUser.length);
 
     const fapshiResponse = await fetch(
       `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/direct-pay`,
