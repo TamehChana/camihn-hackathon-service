@@ -72,7 +72,10 @@ export async function POST(req: NextRequest) {
     // 2) Create payment with Fapshi (Initiate Pay)
     const reference = `CAMIHN-${team.id}-${Date.now()}`;
 
-    if (!process.env.FAPSHI_API_USER || !process.env.FAPSHI_API_KEY) {
+    const apiUser = process.env.FAPSHI_API_USER;
+    const apiKey = process.env.FAPSHI_API_KEY;
+
+    if (!apiUser || !apiKey) {
       console.error("Fapshi configuration error: missing FAPSHI_API_USER or FAPSHI_API_KEY");
       return NextResponse.json(
         { error: "Payment configuration error" },
@@ -80,14 +83,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Helpful debug log (masked) to confirm which apiUser is loaded in this environment
+    console.log("Fapshi apiUser (masked):", `${apiUser.substring(0, 6)}...`);
+
     const fapshiResponse = await fetch(
       `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/direct-pay`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: process.env.FAPSHI_API_KEY,
-          apiuser: process.env.FAPSHI_API_USER,
+          apikey: apiKey,
+          apiuser: apiUser,
         },
         body: JSON.stringify({
           amount,
@@ -103,9 +109,21 @@ export async function POST(req: NextRequest) {
     );
 
     if (!fapshiResponse.ok) {
-      console.error("Fapshi error", await fapshiResponse.text());
+      const rawError = await fapshiResponse.text();
+      console.error("Fapshi error", rawError);
+
+      let parsed: { message?: string } | null = null;
+      try {
+        parsed = JSON.parse(rawError);
+      } catch {
+        // ignore JSON parse error
+      }
+
       return NextResponse.json(
-        { error: "Unable to initiate payment with Fapshi" },
+        {
+          error: parsed?.message || "Unable to initiate payment with Fapshi",
+          providerMessage: rawError,
+        },
         { status: 502, headers: corsHeaders },
       );
     }
