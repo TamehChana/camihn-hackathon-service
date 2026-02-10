@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           amount,
           email: lead.email,
-          redirectUrl: `${process.env.APP_BASE_URL}/hackathon/register/success`,
+          redirectUrl: `${process.env.APP_BASE_URL}/hackathon/register/success?teamId=${team.id}`,
           userId: team.id,
           externalId: reference,
           message: "CAMIHN Hackathon Team Registration",
