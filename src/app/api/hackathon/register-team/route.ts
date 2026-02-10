@@ -78,11 +78,10 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Adjust auth headers to match Fapshi docs (API User + API Key)
-          "X-API-USER": process.env.FAPSHI_API_USER ?? "",
-          "X-API-KEY": process.env.FAPSHI_API_KEY ?? "",
         },
         body: JSON.stringify({
+          apiuser: process.env.FAPSHI_API_USER,
+          apikey: process.env.FAPSHI_API_KEY,
           amount,
           currency,
           reference,
