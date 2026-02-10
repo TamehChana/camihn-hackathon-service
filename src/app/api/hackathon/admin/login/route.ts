@@ -14,13 +14,15 @@ export function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { password?: string };
+    const body = (await req.json()) as { username?: string; password?: string };
+    const username = body.username ?? "";
     const password = body.password ?? "";
 
+    const expectedUsername = process.env.HACKATHON_ADMIN_USERNAME;
     const expectedPassword = process.env.HACKATHON_ADMIN_PASSWORD;
     const adminToken = process.env.HACKATHON_ADMIN_TOKEN;
 
-    if (!expectedPassword || !adminToken) {
+    if (!expectedUsername || !expectedPassword || !adminToken) {
       console.error("Hackathon admin env vars missing");
       return NextResponse.json(
         { error: "Admin not configured" },
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (password !== expectedPassword) {
+    if (username !== expectedUsername || password !== expectedPassword) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401, headers: corsHeaders },
