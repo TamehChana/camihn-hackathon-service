@@ -147,7 +147,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const providerRef = fapshiData.transId ?? reference;
+    // Webhook uses "reference" to identify the transaction,
+    // so store our own reference/externalId as providerRef.
+    const providerRef = reference;
 
     // 3) Persist payment record
     await prisma.payment.create({
