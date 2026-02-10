@@ -15,6 +15,18 @@ type RegisterTeamPayload = {
   members: TeamMemberInput[];
 };
 
+const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export function OPTIONS() {
+  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as RegisterTeamPayload;
@@ -23,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (!teamName || !lead?.name || !lead?.email || !lead?.phone || !lead?.role) {
       return NextResponse.json(
         { error: "Missing required team or lead fields" },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -31,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (cleanedMembers.length === 0) {
       return NextResponse.json(
         { error: "At least one teammate is required" },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -94,7 +106,7 @@ export async function POST(req: NextRequest) {
       console.error("Fapshi error", await fapshiResponse.text());
       return NextResponse.json(
         { error: "Unable to initiate payment with Fapshi" },
-        { status: 502 },
+        { status: 502, headers: corsHeaders },
       );
     }
 
@@ -110,7 +122,7 @@ export async function POST(req: NextRequest) {
     if (!checkoutUrl) {
       return NextResponse.json(
         { error: "Fapshi did not return a checkout URL" },
-        { status: 502 },
+        { status: 502, headers: corsHeaders },
       );
     }
 
@@ -128,22 +140,23 @@ export async function POST(req: NextRequest) {
     });
 
     // 4) Respond to frontend with checkout URL
-    return NextResponse.json({
-      teamId: team.id,
-      payment: {
-        amount,
-        currency,
-        provider: "FAPSHI",
-        checkoutUrl,
+    return NextResponse.json(
+      {
+        teamId: team.id,
+        payment: {
+          amount,
+          currency,
+          provider: "FAPSHI",
+          checkoutUrl,
+        },
       },
-    });
+      { headers: corsHeaders },
+    );
   } catch (error) {
     console.error("register-team error", error);
     return NextResponse.json(
       { error: "Unable to create registration" },
-      { status: 500 },
+      { status: 500, headers: corsHeaders },
     );
   }
 }
-
-
