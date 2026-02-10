@@ -15,10 +15,10 @@ export function OPTIONS() {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { teamId: string } },
+  context: { params: Promise<{ teamId: string }> },
 ) {
   try {
-    const { teamId } = params;
+    const { teamId } = await context.params;
 
     const team = await prisma.team.findUnique({
       where: { id: teamId },
