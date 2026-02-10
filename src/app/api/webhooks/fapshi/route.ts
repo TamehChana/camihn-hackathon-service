@@ -47,12 +47,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    const newStatus = payload.status.toUpperCase();
+    const newStatus = (payload.status || "").toUpperCase();
 
     const updatedPayment = await prisma.payment.update({
       where: { id: payment.id },
       data: {
-        status: newStatus === "SUCCESS" ? "SUCCESS" : "FAILED",
+        status: newStatus === "SUCCESS" || newStatus.startsWith("SUCCESS")
+          ? "SUCCESS"
+          : "FAILED",
         rawPayload: payload as unknown as object,
       },
     });
