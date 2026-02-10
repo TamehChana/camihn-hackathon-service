@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     const amount = 10_000;
     const currency = "XAF";
 
-    // 2) Create payment with Fapshi (Initiate Pay)
+    // 2) Create payment link with Fapshi (Generate Payment Link / initiate-pay)
     const reference = `CAMIHN-${team.id}-${Date.now()}`;
 
     const rawApiUser = process.env.FAPSHI_API_USER;
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     );
 
     const fapshiResponse = await fetch(
-      `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/direct-pay`,
+      `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/initiate-pay`,
       {
         method: "POST",
         headers: {
@@ -103,10 +103,8 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           amount,
-          phone: lead.phone,
-          medium: "mobile money",
-          name: lead.name,
           email: lead.email,
+          redirectUrl: `${process.env.APP_BASE_URL}/hackathon/register/success`,
           userId: team.id,
           externalId: reference,
           message: "CAMIHN Hackathon Team Registration",
@@ -136,10 +134,18 @@ export async function POST(req: NextRequest) {
 
     const fapshiData = (await fapshiResponse.json()) as {
       message?: string;
+      link?: string;
       transId?: string;
       dateInitiated?: string;
       [key: string]: unknown;
     };
+
+    if (!fapshiData.link) {
+      return NextResponse.json(
+        { error: "Fapshi did not return a payment link" },
+        { status: 502, headers: corsHeaders },
+      );
+    }
 
     const providerRef = fapshiData.transId ?? reference;
 
@@ -156,7 +162,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 4) Respond to frontend with checkout URL
+    // 4) Respond to frontend with payment link
     return NextResponse.json(
       {
         teamId: team.id,
@@ -164,8 +170,9 @@ export async function POST(req: NextRequest) {
           amount,
           currency,
           provider: "FAPSHI",
-          reference: providerRef,
-          message: fapshiData.message ?? "Payment initiated",
+          link: fapshiData.link,
+          transId: providerRef,
+          message: fapshiData.message ?? "Payment link generated",
         },
       },
       { headers: corsHeaders },
