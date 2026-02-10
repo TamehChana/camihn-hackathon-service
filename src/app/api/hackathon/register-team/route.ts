@@ -69,35 +69,31 @@ export async function POST(req: NextRequest) {
     const amount = 10_000;
     const currency = "XAF";
 
-    // 2) Create payment with Fapshi
-    // NOTE: Replace URL, headers, and payload with the exact values from:
-    // https://docs.fapshi.com/en/api-reference
+    // 2) Create payment with Fapshi (Initiate Pay)
     const reference = `CAMIHN-${team.id}-${Date.now()}`;
 
     const fapshiResponse = await fetch(
-      `${process.env.FAPSHI_API_BASE_URL ?? ""}/payments`,
+      `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/initiate-pay`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.FAPSHI_SECRET_KEY}`,
+          // Adjust auth headers to match Fapshi docs (API User + API Key)
+          "X-API-USER": process.env.FAPSHI_API_USER ?? "",
+          "X-API-KEY": process.env.FAPSHI_API_KEY ?? "",
         },
         body: JSON.stringify({
           amount,
           currency,
           reference,
           description: "CAMIHN Hackathon Team Registration",
-          // Adjust field names to Fapshi's spec:
           customer: {
             name: lead.name,
             email: lead.email,
             phone: lead.phone,
           },
-          // Where Fapshi should redirect the user after payment:
           success_url: `${process.env.APP_BASE_URL}/hackathon/register/success`,
           cancel_url: `${process.env.APP_BASE_URL}/hackathon/register/cancel`,
-          // Webhook URL is typically configured in the Fapshi dashboard,
-          // but can also be passed here if supported.
         }),
       },
     );
