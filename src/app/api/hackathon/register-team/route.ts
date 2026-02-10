@@ -151,6 +151,9 @@ export async function POST(req: NextRequest) {
     // so store our own reference/externalId as providerRef.
     const providerRef = reference;
 
+    console.log("Storing payment with providerRef:", providerRef);
+    console.log("Fapshi response data:", JSON.stringify(fapshiData, null, 2));
+
     // 3) Persist payment record
     await prisma.payment.create({
       data: {
@@ -163,6 +166,8 @@ export async function POST(req: NextRequest) {
         rawPayload: fapshiData as unknown as object,
       },
     });
+
+    console.log("Payment record created for team:", team.id);
 
     // 4) Respond to frontend with payment link
     return NextResponse.json(
