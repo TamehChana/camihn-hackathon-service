@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const amount = 10_000;
+    const amount = 1_000;
     const currency = "XAF";
 
     // 2) Create payment link with Fapshi (Generate Payment Link / initiate-pay)
