@@ -72,27 +72,32 @@ export async function POST(req: NextRequest) {
     // 2) Create payment with Fapshi (Initiate Pay)
     const reference = `CAMIHN-${team.id}-${Date.now()}`;
 
+    if (!process.env.FAPSHI_API_USER || !process.env.FAPSHI_API_KEY) {
+      console.error("Fapshi configuration error: missing FAPSHI_API_USER or FAPSHI_API_KEY");
+      return NextResponse.json(
+        { error: "Payment configuration error" },
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
     const fapshiResponse = await fetch(
-      `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/initiate-pay`,
+      `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/direct-pay`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          apikey: process.env.FAPSHI_API_KEY,
+          apiuser: process.env.FAPSHI_API_USER,
         },
         body: JSON.stringify({
-          apiuser: process.env.FAPSHI_API_USER,
-          apikey: process.env.FAPSHI_API_KEY,
           amount,
-          currency,
-          reference,
-          description: "CAMIHN Hackathon Team Registration",
-          customer: {
-            name: lead.name,
-            email: lead.email,
-            phone: lead.phone,
-          },
-          success_url: `${process.env.APP_BASE_URL}/hackathon/register/success`,
-          cancel_url: `${process.env.APP_BASE_URL}/hackathon/register/cancel`,
+          phone: lead.phone,
+          medium: "mobile money",
+          name: lead.name,
+          email: lead.email,
+          userId: team.id,
+          externalId: reference,
+          message: "CAMIHN Hackathon Team Registration",
         }),
       },
     );
@@ -106,20 +111,13 @@ export async function POST(req: NextRequest) {
     }
 
     const fapshiData = (await fapshiResponse.json()) as {
-      checkout_url?: string;
-      reference?: string;
+      message?: string;
+      transId?: string;
+      dateInitiated?: string;
       [key: string]: unknown;
     };
 
-    const checkoutUrl = fapshiData.checkout_url;
-    const providerRef = (fapshiData.reference as string) ?? reference;
-
-    if (!checkoutUrl) {
-      return NextResponse.json(
-        { error: "Fapshi did not return a checkout URL" },
-        { status: 502, headers: corsHeaders },
-      );
-    }
+    const providerRef = fapshiData.transId ?? reference;
 
     // 3) Persist payment record
     await prisma.payment.create({
@@ -142,7 +140,8 @@ export async function POST(req: NextRequest) {
           amount,
           currency,
           provider: "FAPSHI",
-          checkoutUrl,
+          reference: providerRef,
+          message: fapshiData.message ?? "Payment initiated",
         },
       },
       { headers: corsHeaders },
