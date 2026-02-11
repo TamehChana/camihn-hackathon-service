@@ -5,7 +5,7 @@ const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const data = teams.map((t) => ({
+    const data = teams.map((t: (typeof teams)[number]) => ({
       id: t.id,
       teamName: t.teamName,
       institution: t.institution,
@@ -64,4 +64,28 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/** DELETE: Reset all – delete all teams (cascades to members and payments). Admin only. */
+export async function DELETE(req: NextRequest) {
+  try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: corsHeaders },
+      );
+    }
+
+    await prisma.team.deleteMany({});
+
+    return NextResponse.json(
+      { ok: true, message: "All teams and payment records have been deleted." },
+      { headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("hackathon admin reset all error", error);
+    return NextResponse.json(
+      { error: "Unable to reset teams" },
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
 
