@@ -6,6 +6,7 @@ type TeamMemberInput = { name: string; email: string; role?: string };
 type RegisterTeamPayload = {
   teamName: string;
   institution?: string;
+  volunteerRef?: string;
   lead: {
     name: string;
     email: string;
@@ -30,7 +31,17 @@ export function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as RegisterTeamPayload;
-    const { teamName, institution, lead, members } = body;
+    const { teamName, institution, volunteerRef, lead, members } = body;
+
+    let volunteerId: string | undefined;
+    if (volunteerRef?.trim()) {
+      const volunteer = await prisma.volunteer.findUnique({
+        where: { refCode: volunteerRef.trim() },
+      });
+      if (volunteer) {
+        volunteerId = volunteer.id;
+      }
+    }
 
     if (!teamName || !lead?.name || !lead?.email || !lead?.phone || !lead?.role) {
       return NextResponse.json(
@@ -52,6 +63,7 @@ export async function POST(req: NextRequest) {
       data: {
         teamName,
         institution,
+        volunteerId: volunteerId ?? undefined,
         leadName: lead.name,
         leadEmail: lead.email,
         leadPhone: lead.phone,

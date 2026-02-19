@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       include: {
         members: true,
+        volunteer: true,
         payments: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -49,6 +50,10 @@ export async function GET(req: NextRequest) {
       leadPhone: t.leadPhone,
       leadRole: t.leadRole,
       status: t.status,
+      volunteerId: t.volunteerId,
+      volunteer: t.volunteer
+        ? { id: t.volunteer.id, name: t.volunteer.name, refCode: t.volunteer.refCode }
+        : null,
       createdAt: t.createdAt,
       members: t.members,
       payment: t.payments[0] ?? null,

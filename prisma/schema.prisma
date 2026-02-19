@@ -7,6 +7,18 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model Volunteer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  refCode   String   @unique
+  teams     Team[]
+  createdAt DateTime @default(now())
+
+  @@index([refCode])
+}
+
 model Team {
   id           String        @id @default(cuid())
   teamName     String
@@ -16,12 +28,15 @@ model Team {
   leadPhone    String
   leadRole     String
   status       TeamStatus    @default(PENDING)
+  volunteerId  String?
+  volunteer    Volunteer?    @relation(fields: [volunteerId], references: [id])
   members      TeamMember[]
   payments     Payment[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   @@index([leadEmail])
+  @@index([volunteerId])
 }
 
 model TeamMember {
@@ -64,5 +79,6 @@ enum PaymentStatus {
   SUCCESS
   FAILED
 }
+
 
 
