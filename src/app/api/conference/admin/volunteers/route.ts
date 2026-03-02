@@ -67,9 +67,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cleanedName = name.trim();
     const volunteer = await prisma.conferenceVolunteer.create({
       data: {
-        name: name.trim(),
+        name: cleanedName,
         email: email.trim(),
         phone: phone.trim(),
         refCode,
@@ -77,7 +78,14 @@ export async function POST(req: NextRequest) {
     });
 
     const baseUrl = process.env.APP_BASE_URL ?? "https://camihn.org";
-    const registrationLink = `${baseUrl}/conference/register?ref=${refCode}`;
+    const nameSlug = cleanedName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40);
+    const registrationLink = `${baseUrl}/conference/register?ref=${encodeURIComponent(
+      nameSlug ? `${nameSlug}-${refCode}` : refCode,
+    )}`;
 
     return NextResponse.json(
       {
@@ -134,13 +142,21 @@ export async function GET(req: NextRequest) {
         (a) => a.payments && a.payments.length > 0,
       ).length;
 
+      const nameSlug = v.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40);
+
       return {
         id: v.id,
         name: v.name,
         email: v.email,
         phone: v.phone,
         refCode: v.refCode,
-        registrationLink: `${baseUrl}/conference/register?ref=${v.refCode}`,
+        registrationLink: `${baseUrl}/conference/register?ref=${encodeURIComponent(
+          nameSlug ? `${nameSlug}-${v.refCode}` : v.refCode,
+        )}`,
         attendeesCount,
         paidAttendeesCount,
         createdAt: v.createdAt,
