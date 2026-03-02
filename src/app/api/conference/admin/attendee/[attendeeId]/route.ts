@@ -12,7 +12,7 @@ const corsHeaders = {
 function isAuthorized(req: NextRequest): boolean {
   const header = req.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const expected = process.env.HACKATHON_ADMIN_TOKEN;
+  const expected = process.env.CONFERENCE_ADMIN_TOKEN;
   return !!expected && token === expected;
 }
 
@@ -22,7 +22,7 @@ export function OPTIONS() {
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: Promise<{ teamId: string }> },
+  context: { params: Promise<{ attendeeId: string }> },
 ) {
   try {
     if (!isAuthorized(req)) {
@@ -32,40 +32,36 @@ export async function PATCH(
       );
     }
 
-    const { teamId } = await context.params;
+    const { attendeeId } = await context.params;
     const body = (await req.json()) as {
-      teamName?: string;
-      institution?: string;
-      leadName?: string;
-      leadEmail?: string;
-      leadPhone?: string;
-      leadRole?: string;
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      organisation?: string;
+      role?: string;
       status?: string;
     };
 
     const data: any = {};
-    if (body.teamName !== undefined) data.teamName = body.teamName;
-    if (body.institution !== undefined) data.institution = body.institution;
-    if (body.leadName !== undefined) data.leadName = body.leadName;
-    if (body.leadEmail !== undefined) data.leadEmail = body.leadEmail;
-    if (body.leadPhone !== undefined) data.leadPhone = body.leadPhone;
-    if (body.leadRole !== undefined) data.leadRole = body.leadRole;
+    if (body.fullName !== undefined) data.fullName = body.fullName;
+    if (body.email !== undefined) data.email = body.email;
+    if (body.phone !== undefined) data.phone = body.phone;
+    if (body.organisation !== undefined) data.organisation = body.organisation;
+    if (body.role !== undefined) data.role = body.role;
     if (body.status !== undefined) data.status = body.status as any;
 
-    const updated = await prisma.team.update({
-      where: { id: teamId },
+    const updated = await prisma.conferenceAttendee.update({
+      where: { id: attendeeId },
       data,
     });
 
     return NextResponse.json(updated, { headers: corsHeaders });
   } catch (error) {
-    console.error("hackathon admin update team error", error);
+    console.error("conference admin update attendee error", error);
     return NextResponse.json(
-      { error: "Unable to update team" },
+      { error: "Unable to update attendee" },
       { status: 500, headers: corsHeaders },
     );
   }
 }
-
-
 

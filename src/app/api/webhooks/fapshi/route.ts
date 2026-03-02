@@ -1,15 +1,38 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // Shape this to match Fapshi's webhook payload from:
-// https://docs.fapshi.com/en/api-reference
+// https://docs.fapshi.com/en/api-reference/endpoint/webhook
 type FapshiWebhookPayload = {
-  reference: string;
-  status: "SUCCESS" | "FAILED" | string;
+  transId?: string;
+  externalId?: string;
+  reference?: string;
+  status: "CREATED" | "PENDING" | "SUCCESSFUL" | "FAILED" | "EXPIRED" | string;
   amount?: number;
   currency?: string;
-  // ...other fields...
+  [key: string]: unknown;
 };
+
+/**
+ * Verify webhook signature to ensure the request came from Fapshi.
+ * Uses HMAC-SHA256(secret, rawBody). If Fapshi uses a different scheme, adjust here.
+ * Constant-time comparison to prevent timing attacks.
+ */
+function verifyWebhookSignature(
+  rawBody: string,
+  signatureHeader: string,
+  secret: string
+): boolean {
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const received = signatureHeader.replace(/^sha256=/, "").trim();
+  if (expected.length !== received.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received, "hex"));
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,29 +40,30 @@ export async function POST(req: NextRequest) {
     const rawBody = await req.text();
 
     console.log("=== FAPSHI WEBHOOK RECEIVED ===");
-    console.log("Fapshi webhook raw body:", rawBody);
     console.log("Signature header:", signature ? "present" : "missing");
 
-    // TODO: Implement signature verification logic using Fapshi's recommended method.
-    // This typically involves computing an HMAC with a shared secret and
-    // comparing it to the signature header. See:
-    // https://docs.fapshi.com/en/guides/webhooks
-    if (!signature || !process.env.FAPSHI_WEBHOOK_SECRET) {
-      console.warn("Missing Fapshi signature or webhook secret; skipping verification.");
+    const webhookSecret = process.env.FAPSHI_WEBHOOK_SECRET?.trim();
+    if (webhookSecret) {
+      if (!signature) {
+        console.warn("Webhook secret set but signature missing; rejecting.");
+        return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+      }
+      if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
+        console.warn("Webhook signature verification failed; rejecting.");
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
     } else {
-      // verifySignature(rawBody, signature, process.env.FAPSHI_WEBHOOK_SECRET);
+      console.warn("FAPSHI_WEBHOOK_SECRET not set; webhook is not verified. Set it in production.");
     }
 
-    const payload = JSON.parse(rawBody) as FapshiWebhookPayload & {
-      transId?: string;
-      externalId?: string;
-      [key: string]: unknown;
-    };
+    const payload = JSON.parse(rawBody) as FapshiWebhookPayload;
 
     console.log("Parsed webhook payload:", JSON.stringify(payload, null, 2));
 
+    // externalId is our reference (e.g. CAMIHN-HACK-{teamId}-{ts} or CAMIHN-CONF-{attendeeId}-{ts});
+    // transId is Fapshi's transaction id
     const providerRef =
-      payload.reference || payload.externalId || payload.transId || "";
+      payload.externalId ?? payload.reference ?? payload.transId ?? "";
 
     console.log("Looking up payment with providerRef:", providerRef);
 
@@ -48,7 +72,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    // Try to find payment by providerRef
+    // First, try to find a hackathon payment by providerRef
     let payment = await prisma.payment.findUnique({
       where: {
         provider_providerRef: {
@@ -58,34 +82,27 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // If not found, try alternative lookup methods
+    // Flag to indicate whether this webhook is for a conference payment
+    let isConference = false;
+
+    // If not found as a hackathon payment, try conference payments
     if (!payment) {
-      console.warn("Payment not found with providerRef:", providerRef);
-      
-      // Try finding by transId if different
-      if (payload.transId && payload.transId !== providerRef) {
-        console.log("Trying to find payment by transId:", payload.transId);
-        payment = await prisma.payment.findFirst({
-          where: {
-            provider: "FAPSHI",
-            providerRef: payload.transId,
-          },
-        });
-      }
+      console.warn("Hackathon payment not found with providerRef:", providerRef);
 
-      // If still not found, try finding by externalId
-      if (!payment && payload.externalId && payload.externalId !== providerRef) {
-        console.log("Trying to find payment by externalId:", payload.externalId);
-        payment = await prisma.payment.findFirst({
-          where: {
+      const conferencePayment = await prisma.conferencePayment.findUnique({
+        where: {
+          provider_providerRef: {
             provider: "FAPSHI",
-            providerRef: payload.externalId,
+            providerRef,
           },
-        });
-      }
+        },
+        include: {
+          attendee: true,
+        },
+      });
 
-      if (!payment) {
-        console.error("Payment not found after all lookup attempts. Available fields:", {
+      if (!conferencePayment) {
+        console.error("No matching payment (hackathon or conference) found. Available fields:", {
           reference: payload.reference,
           externalId: payload.externalId,
           transId: payload.transId,
@@ -93,22 +110,80 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json({ received: true }, { status: 200 });
       }
+
+      isConference = true;
+
+      // Fapshi sends SUCCESSFUL | FAILED | EXPIRED
+      const newStatus = (payload.status ?? "").toUpperCase();
+      const isSuccess =
+        newStatus === "SUCCESS" ||
+        newStatus === "SUCCESSFUL" ||
+        newStatus.startsWith("SUCCESS");
+
+      const resolvedStatus =
+        conferencePayment.status === "SUCCESS"
+          ? "SUCCESS"
+          : isSuccess
+            ? "SUCCESS"
+            : "FAILED";
+
+      console.log("Updating conference payment status:", {
+        paymentId: conferencePayment.id,
+        oldStatus: conferencePayment.status,
+        newStatus: resolvedStatus,
+        rawStatus: payload.status,
+      });
+
+      const updatedConferencePayment = await prisma.conferencePayment.update({
+        where: { id: conferencePayment.id },
+        data: {
+          status: resolvedStatus,
+          rawPayload: payload as unknown as object,
+        },
+      });
+
+      if (updatedConferencePayment.status === "SUCCESS") {
+        console.log(
+          "Conference payment successful, updating attendee status to PAID for attendee:",
+          conferencePayment.attendeeId,
+        );
+        await prisma.conferenceAttendee.update({
+          where: { id: conferencePayment.attendeeId },
+          data: { status: "PAID" },
+        });
+        console.log("Conference attendee status updated successfully");
+      }
+
+      console.log("=== CONFERENCE WEBHOOK PROCESSING COMPLETE ===");
+      return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    const newStatus = (payload.status || "").toUpperCase();
-    const isSuccess = newStatus === "SUCCESS" || newStatus.startsWith("SUCCESS");
+    // Fapshi sends SUCCESSFUL | FAILED | EXPIRED for hackathon payments
+    const newStatus = (payload.status ?? "").toUpperCase();
+    const isSuccess =
+      newStatus === "SUCCESS" ||
+      newStatus === "SUCCESSFUL" ||
+      newStatus.startsWith("SUCCESS");
+
+    // Idempotency: do not overwrite SUCCESS with FAILED (e.g. out-of-order webhooks)
+    const resolvedStatus =
+      payment.status === "SUCCESS"
+        ? "SUCCESS"
+        : isSuccess
+          ? "SUCCESS"
+          : "FAILED";
 
     console.log("Updating payment status:", {
       paymentId: payment.id,
       oldStatus: payment.status,
-      newStatus: isSuccess ? "SUCCESS" : "FAILED",
+      newStatus: resolvedStatus,
       rawStatus: payload.status,
     });
 
     const updatedPayment = await prisma.payment.update({
       where: { id: payment.id },
       data: {
-        status: isSuccess ? "SUCCESS" : "FAILED",
+        status: resolvedStatus,
         rawPayload: payload as unknown as object,
       },
     });

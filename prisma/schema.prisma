@@ -68,7 +68,60 @@ model Payment {
   @@index([teamId])
 }
 
+model ConferenceVolunteer {
+  id        String                @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  refCode   String                @unique
+  attendees ConferenceAttendee[]
+  createdAt DateTime              @default(now())
+
+  @@index([refCode])
+}
+
+model ConferenceAttendee {
+  id           String                  @id @default(cuid())
+  fullName     String
+  email        String
+  phone        String
+  organisation String?
+  role         String?
+  status       ConferenceAttendeeStatus @default(PENDING)
+  volunteerId  String?
+  volunteer    ConferenceVolunteer?     @relation(fields: [volunteerId], references: [id])
+  payments     ConferencePayment[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@index([email])
+  @@index([volunteerId])
+}
+
+model ConferencePayment {
+  id          String        @id @default(cuid())
+  attendee    ConferenceAttendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  attendeeId  String
+  amount      Int
+  currency    String
+  provider    String
+  providerRef String
+  status      PaymentStatus @default(INITIATED)
+  rawPayload  Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([attendeeId])
+}
+
 enum TeamStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum ConferenceAttendeeStatus {
   PENDING
   PAID
   CANCELLED
