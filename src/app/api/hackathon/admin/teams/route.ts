@@ -41,23 +41,29 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const data = teams.map((t: (typeof teams)[number]) => ({
-      id: t.id,
-      teamName: t.teamName,
-      institution: t.institution,
-      leadName: t.leadName,
-      leadEmail: t.leadEmail,
-      leadPhone: t.leadPhone,
-      leadRole: t.leadRole,
-      status: t.status,
-      volunteerId: t.volunteerId,
-      volunteer: t.volunteer
-        ? { id: t.volunteer.id, name: t.volunteer.name, refCode: t.volunteer.refCode }
-        : null,
-      createdAt: t.createdAt,
-      members: t.members,
-      payment: t.payments[0] ?? null,
-    }));
+    const data = teams.map((t: (typeof teams)[number]) => {
+      const latestPayment = t.payments[0] ?? null;
+      const hasSuccessfulPayment = latestPayment?.status === "SUCCESS";
+      // Derive status: if payment succeeded, team is PAID (keeps display correct when Team.status was not yet synced)
+      const displayStatus = hasSuccessfulPayment ? "PAID" : t.status;
+      return {
+        id: t.id,
+        teamName: t.teamName,
+        institution: t.institution,
+        leadName: t.leadName,
+        leadEmail: t.leadEmail,
+        leadPhone: t.leadPhone,
+        leadRole: t.leadRole,
+        status: displayStatus,
+        volunteerId: t.volunteerId,
+        volunteer: t.volunteer
+          ? { id: t.volunteer.id, name: t.volunteer.name, refCode: t.volunteer.refCode }
+          : null,
+        createdAt: t.createdAt,
+        members: t.members,
+        payment: latestPayment ?? null,
+      };
+    });
 
     return NextResponse.json(data, { headers: corsHeaders });
   } catch (error) {

@@ -5,7 +5,7 @@ const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "PATCH, OPTIONS",
+  "Access-Control-Allow-Methods": "PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -43,18 +43,33 @@ export async function PATCH(
       status?: string;
     };
 
-    const data: any = {};
+    const data: Record<string, unknown> = {};
     if (body.teamName !== undefined) data.teamName = body.teamName;
     if (body.institution !== undefined) data.institution = body.institution;
     if (body.leadName !== undefined) data.leadName = body.leadName;
     if (body.leadEmail !== undefined) data.leadEmail = body.leadEmail;
     if (body.leadPhone !== undefined) data.leadPhone = body.leadPhone;
     if (body.leadRole !== undefined) data.leadRole = body.leadRole;
-    if (body.status !== undefined) data.status = body.status as any;
+    if (body.status !== undefined) {
+      const s = body.status as string;
+      if (s === "PENDING" || s === "PAID" || s === "CANCELLED") data.status = s;
+    }
 
-    const updated = await prisma.team.update({
-      where: { id: teamId },
-      data,
+    const updated = await prisma.$transaction(async (tx) => {
+      const team = await tx.team.update({
+        where: { id: teamId },
+        data: data as { teamName?: string; institution?: string; leadName?: string; leadEmail?: string; leadPhone?: string; leadRole?: string; status?: "PENDING" | "PAID" | "CANCELLED" },
+        include: { payments: { orderBy: { createdAt: "desc" }, take: 1 } },
+      });
+      if (body.status !== undefined && team.payments.length > 0) {
+        const payment = team.payments[0];
+        if (body.status === "PAID" && payment.status !== "SUCCESS") {
+          await tx.payment.update({ where: { id: payment.id }, data: { status: "SUCCESS" } });
+        } else if (body.status === "PENDING" && payment.status === "SUCCESS") {
+          await tx.payment.update({ where: { id: payment.id }, data: { status: "INITIATED" } });
+        }
+      }
+      return tx.team.findUniqueOrThrow({ where: { id: teamId } });
     });
 
     return NextResponse.json(updated, { headers: corsHeaders });
@@ -67,5 +82,27 @@ export async function PATCH(
   }
 }
 
-
-
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ teamId: string }> },
+) {
+  try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: corsHeaders },
+      );
+    }
+    const { teamId } = await context.params;
+    await prisma.team.delete({
+      where: { id: teamId },
+    });
+    return NextResponse.json({ deleted: true, teamId }, { headers: corsHeaders });
+  } catch (error) {
+    console.error("hackathon admin delete team error", error);
+    return NextResponse.json(
+      { error: "Unable to delete team" },
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}

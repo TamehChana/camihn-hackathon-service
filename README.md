@@ -36,6 +36,8 @@ FAPSHI_API_USER=your_api_user
 FAPSHI_API_KEY=your_api_key
 # Required in production: verifies webhook requests are from Fapshi (HMAC-SHA256).
 FAPSHI_WEBHOOK_SECRET=your_webhook_secret
+# Optional: secret for cron job that syncs INITIATED payments with Fapshi (backup when webhook fails)
+CRON_SECRET=your_cron_secret
 # Admin credentials for hackathon admin panel
 HACKATHON_ADMIN_USERNAME=your_admin_username
 HACKATHON_ADMIN_PASSWORD=your_admin_password
@@ -64,4 +66,12 @@ The service will be available at `http://localhost:3000`.
 - **Secrets**: `FAPSHI_API_USER`, `FAPSHI_API_KEY`, and `FAPSHI_WEBHOOK_SECRET` are read from the environment and never exposed to the frontend.
 - **Webhook verification**: When `FAPSHI_WEBHOOK_SECRET` is set, incoming Fapshi webhooks are verified with HMAC-SHA256. Requests with a missing or invalid signature are rejected (401). **Set this in production** so only Fapshi can mark payments as successful.
 - **Idempotency**: The webhook handler does not overwrite a payment that is already `SUCCESS` with `FAILED`, avoiding issues from out-of-order or duplicate webhooks.
+
+## Backup: sync INITIATED payments with Fapshi
+
+Fapshi sends only one webhook per event and does not retry. A **sync job** checks all `INITIATED` hackathon payments against Fapshi's payment-status API and updates your DB when Fapshi reports SUCCESSFUL, FAILED, or EXPIRED.
+
+- **Endpoint**: `POST` or `GET` `/api/hackathon/admin/sync-fapshi-payments`
+- **Auth**: `Authorization: Bearer <token>` with `HACKATHON_ADMIN_TOKEN` or `CRON_SECRET`
+- Run periodically (e.g. every 15-30 min): `curl -X POST "https://your-api/api/hackathon/admin/sync-fapshi-payments" -H "Authorization: Bearer $CRON_SECRET"`
 

@@ -87,7 +87,12 @@ export async function POST(req: NextRequest) {
 
     // If not found as a hackathon payment, try conference payments
     if (!payment) {
-      console.warn("Hackathon payment not found with providerRef:", providerRef);
+      console.warn(
+        "[Fapshi webhook] Hackathon payment not found with providerRef:",
+        providerRef,
+        "| Payload refs:",
+        { externalId: payload.externalId, reference: payload.reference, transId: payload.transId }
+      );
 
       const conferencePayment = await prisma.conferencePayment.findUnique({
         where: {
@@ -102,12 +107,10 @@ export async function POST(req: NextRequest) {
       });
 
       if (!conferencePayment) {
-        console.error("No matching payment (hackathon or conference) found. Available fields:", {
-          reference: payload.reference,
-          externalId: payload.externalId,
-          transId: payload.transId,
-          providerRef,
-        });
+        console.error(
+          "[Fapshi webhook] No matching payment (hackathon or conference). Lookup failed – Fapshi may not have sent externalId, or webhook URL/secret may have prevented earlier delivery. Fields used for lookup:",
+          { reference: payload.reference, externalId: payload.externalId, transId: payload.transId, providerRef, status: payload.status }
+        );
         return NextResponse.json({ received: true }, { status: 200 });
       }
 
