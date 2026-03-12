@@ -42,17 +42,45 @@ export async function PATCH(
       status?: string;
     };
 
-    const data: any = {};
+    const data: Record<string, unknown> = {};
     if (body.fullName !== undefined) data.fullName = body.fullName;
     if (body.email !== undefined) data.email = body.email;
     if (body.phone !== undefined) data.phone = body.phone;
     if (body.organisation !== undefined) data.organisation = body.organisation;
     if (body.role !== undefined) data.role = body.role;
-    if (body.status !== undefined) data.status = body.status as any;
+    if (body.status !== undefined) {
+      const s = body.status as string;
+      if (s === "PENDING" || s === "PAID" || s === "CANCELLED") data.status = s;
+    }
 
-    const updated = await prisma.conferenceAttendee.update({
-      where: { id: attendeeId },
-      data,
+    const updated = await prisma.$transaction(async (tx) => {
+      const attendee = await tx.conferenceAttendee.update({
+        where: { id: attendeeId },
+        data: data as {
+          fullName?: string;
+          email?: string;
+          phone?: string;
+          organisation?: string;
+          role?: string;
+          status?: "PENDING" | "PAID" | "CANCELLED";
+        },
+        include: { payments: { orderBy: { createdAt: "desc" }, take: 1 } },
+      });
+      if (body.status !== undefined && attendee.payments.length > 0) {
+        const payment = attendee.payments[0];
+        if (body.status === "PAID" && payment.status !== "SUCCESS") {
+          await tx.conferencePayment.update({
+            where: { id: payment.id },
+            data: { status: "SUCCESS" },
+          });
+        } else if (body.status === "PENDING" && payment.status === "SUCCESS") {
+          await tx.conferencePayment.update({
+            where: { id: payment.id },
+            data: { status: "INITIATED" },
+          });
+        }
+      }
+      return tx.conferenceAttendee.findUniqueOrThrow({ where: { id: attendeeId } });
     });
 
     return NextResponse.json(updated, { headers: corsHeaders });

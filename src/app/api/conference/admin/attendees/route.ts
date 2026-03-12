@@ -40,21 +40,27 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const data = attendees.map((a) => ({
-      id: a.id,
-      fullName: a.fullName,
-      email: a.email,
-      phone: a.phone,
-      organisation: a.organisation,
-      role: a.role,
-      status: a.status,
-      volunteerId: a.volunteerId,
-      volunteer: a.volunteer
-        ? { id: a.volunteer.id, name: a.volunteer.name, refCode: a.volunteer.refCode }
-        : null,
-      createdAt: a.createdAt,
-      payment: a.payments[0] ?? null,
-    }));
+    const data = attendees.map((a) => {
+      const latestPayment = a.payments[0] ?? null;
+      const hasSuccessfulPayment = latestPayment?.status === "SUCCESS";
+      // Derive status for display: if payment succeeded, attendee is PAID
+      const displayStatus = hasSuccessfulPayment ? "PAID" : a.status;
+      return {
+        id: a.id,
+        fullName: a.fullName,
+        email: a.email,
+        phone: a.phone,
+        organisation: a.organisation,
+        role: a.role,
+        status: displayStatus,
+        volunteerId: a.volunteerId,
+        volunteer: a.volunteer
+          ? { id: a.volunteer.id, name: a.volunteer.name, refCode: a.volunteer.refCode }
+          : null,
+        createdAt: a.createdAt,
+        payment: latestPayment ?? null,
+      };
+    });
 
     return NextResponse.json(data, { headers: corsHeaders });
   } catch (error) {
