@@ -46,6 +46,24 @@ export async function GET(req: NextRequest) {
     const data = attendees.map((a) => {
       const successfulPayment = a.payments[0] ?? null;
       const displayStatus = successfulPayment ? "PAID" : a.status;
+
+      // Do not treat an attendee as being "referred by themselves".
+      // Self-referral is approximated as same email or same name on attendee and volunteer.
+      const hasVolunteer = !!a.volunteer;
+      const isSelfReferral =
+        hasVolunteer &&
+        ((a.volunteer!.email &&
+          a.email &&
+          a.volunteer!.email.toLowerCase() === a.email.toLowerCase()) ||
+          (a.volunteer!.name &&
+            a.fullName &&
+            a.volunteer!.name.trim().toLowerCase() === a.fullName.trim().toLowerCase()));
+
+      const volunteer =
+        hasVolunteer && !isSelfReferral
+          ? { id: a.volunteer!.id, name: a.volunteer!.name, refCode: a.volunteer!.refCode }
+          : null;
+
       return {
         id: a.id,
         fullName: a.fullName,
@@ -54,10 +72,8 @@ export async function GET(req: NextRequest) {
         organisation: a.organisation,
         role: a.role,
         status: displayStatus,
-        volunteerId: a.volunteerId,
-        volunteer: a.volunteer
-          ? { id: a.volunteer.id, name: a.volunteer.name, refCode: a.volunteer.refCode }
-          : null,
+        volunteerId: volunteer ? a.volunteerId : null,
+        volunteer,
         createdAt: a.createdAt,
         payment: successfulPayment ?? null,
       };

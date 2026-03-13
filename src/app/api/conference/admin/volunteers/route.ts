@@ -137,8 +137,19 @@ export async function GET(req: NextRequest) {
     const baseUrl = process.env.APP_BASE_URL ?? "https://camihn.org";
 
     const data = volunteers.map((v) => {
-      const attendeesCount = v.attendees.length;
-      const paidAttendeesCount = v.attendees.filter(
+      // Filter out "self-referrals": where attendee and volunteer are the same person.
+      const realAttendees = v.attendees.filter((a) => {
+        const sameEmail =
+          !!a.email && !!v.email && a.email.toLowerCase() === v.email.toLowerCase();
+        const sameName =
+          !!a.fullName &&
+          !!v.name &&
+          a.fullName.trim().toLowerCase() === v.name.trim().toLowerCase();
+        return !(sameEmail || sameName);
+      });
+
+      const attendeesCount = realAttendees.length;
+      const paidAttendeesCount = realAttendees.filter(
         (a) => a.payments && a.payments.length > 0,
       ).length;
 
