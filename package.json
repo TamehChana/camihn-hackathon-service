@@ -11,7 +11,9 @@
     "prisma:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "check-paid-teams": "node scripts/check-paid-teams.js",
-    "mark-payments-paid": "node scripts/mark-payments-paid.js"
+    "mark-payments-paid": "node scripts/mark-payments-paid.js",
+    "check-conference-paid": "node scripts/check-conference-paid.js",
+    "mark-conference-payments-paid": "node scripts/mark-conference-payments-paid.js"
   },
   "dependencies": {
     "@prisma/client": "^6",
