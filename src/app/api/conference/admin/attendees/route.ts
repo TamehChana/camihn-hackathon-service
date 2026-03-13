@@ -32,7 +32,10 @@ export async function GET(req: NextRequest) {
     const attendees = await prisma.conferenceAttendee.findMany({
       orderBy: { createdAt: "desc" },
       include: {
+        // For stats we care about whether there is at least one successful payment.
+        // If an attendee has ever paid successfully, they should remain counted as paid.
         payments: {
+          where: { status: "SUCCESS" },
           orderBy: { createdAt: "desc" },
           take: 1,
         },
@@ -41,10 +44,8 @@ export async function GET(req: NextRequest) {
     });
 
     const data = attendees.map((a) => {
-      const latestPayment = a.payments[0] ?? null;
-      const hasSuccessfulPayment = latestPayment?.status === "SUCCESS";
-      // Derive status for display: if payment succeeded, attendee is PAID
-      const displayStatus = hasSuccessfulPayment ? "PAID" : a.status;
+      const successfulPayment = a.payments[0] ?? null;
+      const displayStatus = successfulPayment ? "PAID" : a.status;
       return {
         id: a.id,
         fullName: a.fullName,
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
           ? { id: a.volunteer.id, name: a.volunteer.name, refCode: a.volunteer.refCode }
           : null,
         createdAt: a.createdAt,
-        payment: latestPayment ?? null,
+        payment: successfulPayment ?? null,
       };
     });
 
