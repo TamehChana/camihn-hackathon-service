@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCorsHeaders } from "@/lib/cors";
 
 type TeamMemberInput = { name: string; email: string; role?: string };
 
@@ -16,16 +17,8 @@ type RegisterTeamPayload = {
   members: TeamMemberInput[];
 };
 
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "POST, OPTIONS" }) });
 }
 
 export async function POST(req: NextRequest) {
@@ -46,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!teamName || !lead?.name || !lead?.email || !lead?.phone || !lead?.role) {
       return NextResponse.json(
         { error: "Missing required team or lead fields" },
-        { status: 400, headers: corsHeaders },
+        { status: 400, headers: getCorsHeaders(req) },
       );
     }
 
@@ -54,7 +47,7 @@ export async function POST(req: NextRequest) {
     if (cleanedMembers.length === 0) {
       return NextResponse.json(
         { error: "At least one teammate is required" },
-        { status: 400, headers: corsHeaders },
+        { status: 400, headers: getCorsHeaders(req) },
       );
     }
 
@@ -93,7 +86,7 @@ export async function POST(req: NextRequest) {
       console.error("Fapshi configuration error: missing FAPSHI_API_USER or FAPSHI_API_KEY");
       return NextResponse.json(
         { error: "Payment configuration error" },
-        { status: 500, headers: corsHeaders },
+        { status: 500, headers: getCorsHeaders(req) },
       );
     }
 
@@ -140,7 +133,7 @@ export async function POST(req: NextRequest) {
           error: parsed?.message || "Unable to initiate payment with Fapshi",
           providerMessage: rawError,
         },
-        { status: 502, headers: corsHeaders },
+        { status: 502, headers: getCorsHeaders(req) },
       );
     }
 
@@ -155,7 +148,7 @@ export async function POST(req: NextRequest) {
     if (!fapshiData.link) {
       return NextResponse.json(
         { error: "Fapshi did not return a payment link" },
-        { status: 502, headers: corsHeaders },
+        { status: 502, headers: getCorsHeaders(req) },
       );
     }
 
@@ -194,13 +187,13 @@ export async function POST(req: NextRequest) {
           message: fapshiData.message ?? "Payment link generated",
         },
       },
-      { headers: corsHeaders },
+      { headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("register-team error", error);
     return NextResponse.json(
       { error: "Unable to create registration" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }

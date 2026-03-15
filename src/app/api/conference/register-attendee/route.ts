@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCorsHeaders } from "@/lib/cors";
 
 type RegisterAttendeePayload = {
   fullName: string;
@@ -10,16 +11,8 @@ type RegisterAttendeePayload = {
   volunteerRef?: string;
 };
 
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "POST, OPTIONS" }) });
 }
 
 export async function POST(req: NextRequest) {
@@ -30,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (!fullName?.trim() || !email?.trim() || !phone?.trim()) {
       return NextResponse.json(
         { error: "Full name, email, and phone are required" },
-        { status: 400, headers: corsHeaders },
+        { status: 400, headers: getCorsHeaders(req) },
       );
     }
 
@@ -67,7 +60,7 @@ export async function POST(req: NextRequest) {
       console.error("Fapshi configuration error: missing FAPSHI_API_USER or FAPSHI_API_KEY");
       return NextResponse.json(
         { error: "Payment configuration error" },
-        { status: 500, headers: corsHeaders },
+        { status: 500, headers: getCorsHeaders(req) },
       );
     }
 
@@ -109,7 +102,7 @@ export async function POST(req: NextRequest) {
           error: parsed?.message || "Unable to initiate conference payment with Fapshi",
           providerMessage: rawError,
         },
-        { status: 502, headers: corsHeaders },
+        { status: 502, headers: getCorsHeaders(req) },
       );
     }
 
@@ -124,7 +117,7 @@ export async function POST(req: NextRequest) {
     if (!fapshiData.link) {
       return NextResponse.json(
         { error: "Fapshi did not return a payment link" },
-        { status: 502, headers: corsHeaders },
+        { status: 502, headers: getCorsHeaders(req) },
       );
     }
 
@@ -154,13 +147,13 @@ export async function POST(req: NextRequest) {
           message: fapshiData.message ?? "Conference payment link generated",
         },
       },
-      { headers: corsHeaders },
+      { headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("conference register-attendee error", error);
     return NextResponse.json(
       { error: "Unable to create conference registration" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }

@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
-
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+import { getCorsHeaders } from "@/lib/cors";
 
 function isAuthorized(req: NextRequest): boolean {
   const header = req.headers.get("authorization") || "";
@@ -21,8 +14,8 @@ function generateRefCode(): string {
   return randomBytes(8).toString("hex");
 }
 
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "GET, POST, OPTIONS" }) });
 }
 
 /** POST: Create a new volunteer and return their unique registration link */
@@ -31,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
@@ -45,7 +38,7 @@ export async function POST(req: NextRequest) {
     if (!name?.trim() || !email?.trim() || !phone?.trim()) {
       return NextResponse.json(
         { error: "Name, email, and phone are required" },
-        { status: 400, headers: corsHeaders },
+        { status: 400, headers: getCorsHeaders(req) },
       );
     }
 
@@ -63,7 +56,7 @@ export async function POST(req: NextRequest) {
     if (attempts >= maxAttempts) {
       return NextResponse.json(
         { error: "Failed to generate unique volunteer link" },
-        { status: 500, headers: corsHeaders },
+        { status: 500, headers: getCorsHeaders(req) },
       );
     }
 
@@ -99,13 +92,13 @@ export async function POST(req: NextRequest) {
         paidTeamsCount: 0,
         createdAt: volunteer.createdAt,
       },
-      { headers: corsHeaders },
+      { headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("hackathon admin create volunteer error", error);
     return NextResponse.json(
       { error: "Unable to create volunteer" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }
@@ -116,7 +109,7 @@ export async function GET(req: NextRequest) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
@@ -163,12 +156,12 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json(data, { headers: corsHeaders });
+    return NextResponse.json(data, { headers: getCorsHeaders(req) });
   } catch (error) {
     console.error("hackathon admin volunteers list error", error);
     return NextResponse.json(
       { error: "Unable to fetch volunteers" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }

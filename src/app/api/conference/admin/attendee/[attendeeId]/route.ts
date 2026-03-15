@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "PATCH, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+import { getCorsHeaders } from "@/lib/cors";
 
 function isAuthorized(req: NextRequest): boolean {
   const header = req.headers.get("authorization") || "";
@@ -16,8 +9,8 @@ function isAuthorized(req: NextRequest): boolean {
   return !!expected && token === expected;
 }
 
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "PATCH, OPTIONS" }) });
 }
 
 export async function PATCH(
@@ -28,7 +21,7 @@ export async function PATCH(
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
@@ -83,12 +76,12 @@ export async function PATCH(
       return tx.conferenceAttendee.findUniqueOrThrow({ where: { id: attendeeId } });
     });
 
-    return NextResponse.json(updated, { headers: corsHeaders });
+    return NextResponse.json(updated, { headers: getCorsHeaders(req) });
   } catch (error) {
     console.error("conference admin update attendee error", error);
     return NextResponse.json(
       { error: "Unable to update attendee" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }

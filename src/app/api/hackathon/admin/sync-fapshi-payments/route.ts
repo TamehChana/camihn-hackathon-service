@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+import { getCorsHeaders } from "@/lib/cors";
 
 function isAuthorized(req: NextRequest): boolean {
   const header = req.headers.get("authorization") || "";
@@ -52,7 +45,7 @@ async function runSync(req: NextRequest) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
@@ -64,7 +57,7 @@ async function runSync(req: NextRequest) {
     if (!apiUser || !apiKey) {
       return NextResponse.json(
         { error: "Fapshi API not configured (FAPSHI_API_USER / FAPSHI_API_KEY)" },
-        { status: 503, headers: corsHeaders },
+        { status: 503, headers: getCorsHeaders(req) },
       );
     }
 
@@ -154,17 +147,17 @@ async function runSync(req: NextRequest) {
         message: "Sync complete",
         ...result,
       },
-      { headers: corsHeaders },
+      { headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("sync-fapshi-payments error", error);
     return NextResponse.json(
       { error: "Sync failed", details: String(error) },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }
 
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "POST, GET, OPTIONS" }) });
 }

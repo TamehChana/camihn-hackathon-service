@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+import { getCorsHeaders } from "@/lib/cors";
 
 function isAuthorized(req: NextRequest): boolean {
   const header = req.headers.get("authorization") || "";
@@ -16,8 +9,8 @@ function isAuthorized(req: NextRequest): boolean {
   return !!expected && token === expected;
 }
 
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "POST, OPTIONS" }) });
 }
 
 /**
@@ -31,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
@@ -41,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!paymentId && !providerRef) {
       return NextResponse.json(
         { error: "Provide paymentId or providerRef (e.g. CAMIHN-xxx-xxx from Fapshi)" },
-        { status: 400, headers: corsHeaders },
+        { status: 400, headers: getCorsHeaders(req) },
       );
     }
 
@@ -65,7 +58,7 @@ export async function POST(req: NextRequest) {
             ? "Payment not found with that id"
             : "No hackathon payment found with that providerRef. Check providerRef in GET /api/hackathon/admin/payments-diagnostics (allPaymentsList).",
         },
-        { status: 404, headers: corsHeaders },
+        { status: 404, headers: getCorsHeaders(req) },
       );
     }
 
@@ -77,7 +70,7 @@ export async function POST(req: NextRequest) {
           teamId: payment.teamId,
           teamName: payment.team?.teamName,
         },
-        { status: 200, headers: corsHeaders },
+        { status: 200, headers: getCorsHeaders(req) },
       );
     }
 
@@ -100,13 +93,13 @@ export async function POST(req: NextRequest) {
         teamName: payment.team?.teamName,
         providerRef: payment.providerRef,
       },
-      { headers: corsHeaders },
+      { headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("mark-payment-paid error", error);
     return NextResponse.json(
       { error: "Unable to mark payment as paid" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }

@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCorsHeaders } from "@/lib/cors";
 
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "GET, OPTIONS" }) });
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ attendeeId: string }> },
 ) {
   try {
@@ -33,7 +26,7 @@ export async function GET(
     if (!attendee) {
       return NextResponse.json(
         { error: "Attendee not found" },
-        { status: 404, headers: corsHeaders },
+        { status: 404, headers: getCorsHeaders(req) },
       );
     }
 
@@ -53,13 +46,13 @@ export async function GET(
         },
         payment,
       },
-      { headers: corsHeaders },
+      { headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("conference attendee receipt error", error);
     return NextResponse.json(
       { error: "Unable to fetch conference receipt" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }

@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "GET, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+import { getCorsHeaders } from "@/lib/cors";
 
 function isAuthorized(req: NextRequest): boolean {
   const header = req.headers.get("authorization") || "";
@@ -16,8 +9,8 @@ function isAuthorized(req: NextRequest): boolean {
   return !!expected && token === expected;
 }
 
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "GET, DELETE, OPTIONS" }) });
 }
 
 export async function GET(req: NextRequest) {
@@ -25,7 +18,7 @@ export async function GET(req: NextRequest) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
@@ -65,12 +58,12 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json(data, { headers: corsHeaders });
+    return NextResponse.json(data, { headers: getCorsHeaders(req) });
   } catch (error) {
     console.error("hackathon admin teams error", error);
     return NextResponse.json(
       { error: "Unable to fetch teams" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }
@@ -81,7 +74,7 @@ export async function DELETE(req: NextRequest) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
@@ -89,13 +82,13 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json(
       { ok: true, message: "All teams and payment records have been deleted." },
-      { headers: corsHeaders },
+      { headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("hackathon admin reset all error", error);
     return NextResponse.json(
       { error: "Unable to reset teams" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }

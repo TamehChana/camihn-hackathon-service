@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCorsHeaders } from "@/lib/cors";
 
-const ALLOWED_ORIGIN = process.env.APP_BASE_URL ?? "https://camihn.org";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: corsHeaders });
+export function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "POST, OPTIONS" }) });
 }
 
 export async function POST(req: NextRequest) {
@@ -26,26 +19,26 @@ export async function POST(req: NextRequest) {
       console.error("Hackathon admin env vars missing");
       return NextResponse.json(
         { error: "Admin not configured" },
-        { status: 500, headers: corsHeaders },
+        { status: 500, headers: getCorsHeaders(req) },
       );
     }
 
     if (username !== expectedUsername || password !== expectedPassword) {
       return NextResponse.json(
         { error: "Invalid credentials" },
-        { status: 401, headers: corsHeaders },
+        { status: 401, headers: getCorsHeaders(req) },
       );
     }
 
     return NextResponse.json(
       { token: adminToken },
-      { status: 200, headers: corsHeaders },
+      { status: 200, headers: getCorsHeaders(req) },
     );
   } catch (error) {
     console.error("hackathon admin login error", error);
     return NextResponse.json(
       { error: "Unable to login" },
-      { status: 500, headers: corsHeaders },
+      { status: 500, headers: getCorsHeaders(req) },
     );
   }
 }
