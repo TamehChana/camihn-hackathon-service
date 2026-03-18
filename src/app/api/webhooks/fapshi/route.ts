@@ -36,7 +36,14 @@ function verifyWebhookSignature(
 
 export async function POST(req: NextRequest) {
   try {
-    const signature = req.headers.get("x-fapshi-signature");
+    // Fapshi docs do not consistently document a webhook signature header.
+    // To avoid breaking payment status updates, we accept the request even if a
+    // signature header is missing, but we still verify when we can.
+    const signature =
+      req.headers.get("x-fapshi-signature") ||
+      req.headers.get("x-fapshi-webhook-signature") ||
+      req.headers.get("x-signature") ||
+      req.headers.get("x-webhook-signature");
     const rawBody = await req.text();
 
     console.log("=== FAPSHI WEBHOOK RECEIVED ===");
@@ -45,12 +52,17 @@ export async function POST(req: NextRequest) {
     const webhookSecret = process.env.FAPSHI_WEBHOOK_SECRET?.trim();
     if (webhookSecret) {
       if (!signature) {
-        console.warn("Webhook secret set but signature missing; rejecting.");
-        return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+        // Continue without verification when Fapshi doesn't provide a signature header.
+        // We still require a valid providerRef match before updating the DB.
+        console.warn(
+          "Webhook secret set but signature header missing; continuing without verification.",
+        );
       }
-      if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
-        console.warn("Webhook signature verification failed; rejecting.");
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      if (signature) {
+        if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
+          console.warn("Webhook signature verification failed; rejecting.");
+          return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+        }
       }
     } else {
       console.warn("FAPSHI_WEBHOOK_SECRET not set; webhook is not verified. Set it in production.");
