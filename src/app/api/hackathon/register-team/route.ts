@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCorsHeaders } from "@/lib/cors";
@@ -51,6 +52,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const appBase = process.env.APP_BASE_URL?.replace(/\/$/, "") ?? "";
+    if (!appBase) {
+      console.error("APP_BASE_URL is required for Fapshi redirect and receipt links");
+      return NextResponse.json(
+        { error: "Payment configuration error" },
+        { status: 500, headers: getCorsHeaders(req) },
+      );
+    }
+
+    const receiptToken = randomBytes(32).toString("hex");
+
     // 1) Create team + members in Postgres
     const team = await prisma.team.create({
       data: {
@@ -61,6 +73,7 @@ export async function POST(req: NextRequest) {
         leadEmail: lead.email,
         leadPhone: lead.phone,
         leadRole: lead.role,
+        receiptToken,
         members: {
           create: cleanedMembers.map((m) => ({
             name: m.name,
@@ -97,6 +110,8 @@ export async function POST(req: NextRequest) {
       apiUser.length,
     );
 
+    const successUrl = `${appBase}/hackathon/register/success?teamId=${encodeURIComponent(team.id)}&token=${encodeURIComponent(receiptToken)}`;
+
     const fapshiResponse = await fetch(
       `${process.env.FAPSHI_API_BASE_URL ?? "https://sandbox.fapshi.com"}/initiate-pay`,
       {
@@ -109,7 +124,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           amount,
           email: lead.email,
-          redirectUrl: `${process.env.APP_BASE_URL}/hackathon/register/success?teamId=${team.id}`,
+          redirectUrl: successUrl,
           userId: team.id,
           externalId: reference,
           message: "CAMIHN Hackathon Team Registration",

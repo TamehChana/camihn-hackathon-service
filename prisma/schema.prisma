@@ -27,6 +27,8 @@ model Team {
   leadEmail    String
   leadPhone    String
   leadRole     String
+  /// Opaque secret for receipt / team lookup; included in post-payment redirect query only.
+  receiptToken String?       @unique
   status       TeamStatus    @default(PENDING)
   volunteerId  String?
   volunteer    Volunteer?    @relation(fields: [volunteerId], references: [id])

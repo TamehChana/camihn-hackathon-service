@@ -1,6 +1,18 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCorsHeaders } from "@/lib/cors";
+
+function receiptTokensMatch(stored: string, provided: string): boolean {
+  try {
+    const a = Buffer.from(stored, "utf8");
+    const b = Buffer.from(provided, "utf8");
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 export function OPTIONS(req: NextRequest) {
   return NextResponse.json({}, { status: 200, headers: getCorsHeaders(req, { methods: "GET, OPTIONS" }) });
@@ -12,6 +24,7 @@ export async function GET(
 ) {
   try {
     const { teamId } = await context.params;
+    const urlToken = req.nextUrl.searchParams.get("token")?.trim() ?? "";
 
     const team = await prisma.team.findUnique({
       where: { id: teamId },
@@ -32,6 +45,21 @@ export async function GET(
     }
 
     const payment = team.payments[0] ?? null;
+
+    // Server-side paid state: legacy bookmarks (?teamId= only) still work for teams already settled.
+    const paidOnServer =
+      team.status === "PAID" && payment !== null && payment.status === "SUCCESS";
+
+    // If team has a receipt token, require a matching ?token= unless we already confirmed payment in DB.
+    if (team.receiptToken) {
+      const tokenOk = urlToken.length > 0 && receiptTokensMatch(team.receiptToken, urlToken);
+      if (!tokenOk && !paidOnServer) {
+        return NextResponse.json(
+          { error: "Invalid or missing receipt token" },
+          { status: 401, headers: getCorsHeaders(req) },
+        );
+      }
+    }
 
     return NextResponse.json(
       {
@@ -59,5 +87,3 @@ export async function GET(
     );
   }
 }
-
-
